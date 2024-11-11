@@ -42,9 +42,6 @@ typedef SimTK::Markers::ObservationIx   MarkerObsIx;
 typedef SimTK::OrientationSensors::OSensorIx     IMUIx;
 typedef SimTK::OrientationSensors::ObservationIx IMUObsIx;
 
-typedef SimTK::DistanceSensors::DSensorIx     DIx;
-typedef SimTK::DistanceSensors::ObservationIx DObsIx;
-
 int main() {
   try
   { // Create the system.
@@ -100,7 +97,6 @@ int main() {
 
     Markers*            markers = new Markers();
     OrientationSensors* imus    = new OrientationSensors();
-    DistanceSensors* ds    = new DistanceSensors();
     ik.adoptAssemblyGoal(markers);
     ik.adoptAssemblyGoal(imus);
     
