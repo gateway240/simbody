@@ -79,7 +79,7 @@ int DistanceSensors::calcGoal(const State& state, Real& goal) const {
                 const Transform& X_GB_B   = mobodB.getBodyTransform(state);
                 const Real& true_dist = (T_GB.p() - X_GB_B.p()).norm();
                 const Real& error = true_dist - obs; // error, in S
-                std::cout << "Error: " << error << " Obs: " << obs << std::endl;
+                // std::cout << "Error: " << error << " Obs: " << obs << std::endl;
                 goal += dsensor.weight * square(error);
                 wtot += dsensor.weight;
             }
@@ -87,7 +87,7 @@ int DistanceSensors::calcGoal(const State& state, Real& goal) const {
     }
 
     goal /= (2*wtot);
-    std::cout << "Goal: " << goal << std::endl;
+    // std::cout << "Goal: " << goal << std::endl;
 
     return 0;
 }

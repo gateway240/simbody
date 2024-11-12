@@ -112,7 +112,7 @@ int main() {
     const IMUIx    p2IMU   = imus->addOSensor(pendulum2, p2IMUOri, imuWeight);
     const IMUIx    p1IMU   = imus->addOSensor(pendulum1, p1IMUOri, imuWeight);
 
-    const Real dWeight = 0.25;
+    const Real dWeight = 0.5;
     const DIx   p3Dist   = ds->addDSensor(pendulum3, pendulum1, p3p1Dist, dWeight);
 
     // const MarkerIx headMarker = markers->addMarker(pendulum1, marker_head);
@@ -198,7 +198,8 @@ int main() {
                           0*slow, YAxis);
         Rotation p1Obs((Pi/8)*fast, ZAxis); // shake head
         Rotation p3Obs(-(Pi/4)*slow, ZAxis);
-        Real p3dObs((double)iters / 100);
+        // Real p3dObs((double)iters / 100);
+        Real p3dObs((Pi/2) * slow + 3);
         // std::cout << p3dObs << std::endl;
         // Vec3 markerObs(Vec3(0,-12,0) + slow*Vec3(5,0,0));
 
