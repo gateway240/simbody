@@ -69,6 +69,8 @@ int main() {
     const Rotation p2IMUOri = tiltedIMU;
     const Rotation p3IMUOri = tiltedIMU;
 
+    const Real p3p1Dist = 0.1;
+
     const Vec3 hdims_head(.3,1,.6);
     const Vec3 marker_head(.3,1,0); // top front
 
@@ -101,21 +103,36 @@ int main() {
     Markers*            markers = new Markers();
     OrientationSensors* imus    = new OrientationSensors();
     DistanceSensors* ds    = new DistanceSensors();
-    ik.adoptAssemblyGoal(markers);
+    // ik.adoptAssemblyGoal(markers);
     ik.adoptAssemblyGoal(imus);
+    ik.adoptAssemblyGoal(ds);
     
-    const IMUIx    p3IMU    = imus->addOSensor(pendulum3, p3IMUOri);
-    const IMUIx    p2IMU   = imus->addOSensor(pendulum2, p2IMUOri);
-    const IMUIx    p1IMU   = imus->addOSensor(pendulum1, p1IMUOri);
-    const MarkerIx headMarker = markers->addMarker(pendulum1, marker_head);
+    const Real imuWeight = 1;
+    const IMUIx    p3IMU    = imus->addOSensor(pendulum3, p3IMUOri, imuWeight);
+    const IMUIx    p2IMU   = imus->addOSensor(pendulum2, p2IMUOri, imuWeight);
+    const IMUIx    p1IMU   = imus->addOSensor(pendulum1, p1IMUOri, imuWeight);
+
+    const Real dWeight = 0.25;
+    const DIx   p3Dist   = ds->addDSensor(pendulum3, pendulum1, p3p1Dist, dWeight);
+
+    // const MarkerIx headMarker = markers->addMarker(pendulum1, marker_head);
 
     ik.initialize(state);
 
     const IMUObsIx p3ObsIx = imus->getObservationIxForOSensor(p3IMU);
     const IMUObsIx p2ObsIx = imus->getObservationIxForOSensor(p2IMU);
     const IMUObsIx p1ObsIx  = imus->getObservationIxForOSensor(p1IMU);
-    const MarkerObsIx headMarkerObsIx = 
-        markers->getObservationIxForMarker(headMarker);
+
+    std::cout << "Number of D sensors: " << ds->getNumDSensors() << std::endl;
+    std::cout << "Number of DS observations: " << ds->getNumObservations() << "Number of IMU observations: " << imus->getNumObservations() << std::endl;
+    std::cout << "Dsensor IX: " << p3Dist << " Dsensor name: " << ds->getDSensorName(p3Dist) << std::endl;
+    std::cout << "IMUS Has observation: " << imus->hasObservation(p3IMU) << std::endl;
+    std::cout << "DS Has observation: " << ds->hasObservation(p3Dist) << std::endl;
+    
+    const DObsIx   p3DObsIx = ds->getObservationIxForDSensor(p3Dist);
+
+    // const MarkerObsIx headMarkerObsIx = 
+    //     markers->getObservationIxForMarker(headMarker);
 
     // Try an initial assembly to an arbitrary pose.
     imus->moveOneObservation(p2ObsIx, 
@@ -126,8 +143,18 @@ int main() {
                                   -Pi/4, ZAxis, 0, YAxis));
     imus->moveOneObservation(p1ObsIx, 
                              Rotation()); // keep aligned with Ground
-    markers->moveOneObservation(headMarkerObsIx,
-                                Vec3(0, -arm_length, 0));
+    // markers->moveOneObservation(headMarkerObsIx,
+    //                             Vec3(0, -arm_length, 0));
+
+    ds->moveOneObservation(p3DObsIx,0.5);
+
+    for (DistanceSensors::DSensorIx mx(0); 
+         mx < ds->getNumDSensors(); ++mx)
+    {
+        printf("mx=%d ox=%d err=%g\n", 
+            (int)mx, (int)ds->getObservationIxForDSensor(mx),
+            ds->findCurrentDSensorError(mx));
+    }
 
     for (OrientationSensors::OSensorIx mx(0); 
          mx < imus->getNumOSensors(); ++mx)
@@ -171,11 +198,14 @@ int main() {
                           0*slow, YAxis);
         Rotation p1Obs((Pi/8)*fast, ZAxis); // shake head
         Rotation p3Obs(-(Pi/4)*slow, ZAxis);
+        Real p3dObs((double)iters / 100);
+        // std::cout << p3dObs << std::endl;
         // Vec3 markerObs(Vec3(0,-12,0) + slow*Vec3(5,0,0));
 
-        imus->moveOneObservation(p2ObsIx, p2Obs);
-        imus->moveOneObservation(p1ObsIx, p1Obs);
+        // imus->moveOneObservation(p2ObsIx, p2Obs);
+        // imus->moveOneObservation(p1ObsIx, p1Obs);
         imus->moveOneObservation(p3ObsIx, p3Obs);
+        ds->moveOneObservation(p3DObsIx,p3dObs);
         // markers->moveOneObservation(headMarkerObsIx, markerObs);
                                         
         ik.track();

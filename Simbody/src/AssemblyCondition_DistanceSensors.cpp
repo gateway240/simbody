@@ -38,13 +38,15 @@ using namespace SimTK;
 //                           DISTANCE SENSORS
 //------------------------------------------------------------------------------
 
-Rotation DistanceSensors::findCurrentDSensorDistance(DSensorIx mx) const {
+Real DistanceSensors::findCurrentDSensorDistance(DSensorIx mx) const {
     const SimbodyMatterSubsystem& matter = getMatterSubsystem();
     const DSensor&                dsensor = getDSensor(mx);
-    const MobilizedBody&          mobod  = matter.getMobilizedBody(dsensor.bodyB);
-    const State&                  state  = getAssembler().getInternalState();
-    const Rotation&               R_GB   = mobod.getBodyRotation(state);
-    return R_GB * dsensor.distanceInB;
+    const MobilizedBody&          mobodA  = matter.getMobilizedBody(dsensor.bodyA);
+    const MobilizedBody&          mobodB  = matter.getMobilizedBody(dsensor.bodyB);
+    const State&                  state   = getAssembler().getInternalState();
+    const Transform&              X_GB_A   = mobodA.getBodyTransform(state);
+    const Transform&              X_GB_B   = mobodB.getBodyTransform(state);
+    return (X_GB_A.p() - X_GB_B.p()).norm();
 }
 
 // goal = 1/2 sum( wi * ai^2 ) / sum(wi) for WRMS 
@@ -59,25 +61,33 @@ int DistanceSensors::calcGoal(const State& state, Real& goal) const {
         const MobilizedBodyIndex    mobodIx      = bodyp->first;
         const Array_<DSensorIx>&    bodyDSensors = bodyp->second;
         const MobilizedBody&        mobod = matter.getMobilizedBody(mobodIx);
-        const Rotation&             R_GB  = mobod.getBodyRotation(state);
+        const Transform&             T_GB  = mobod.getBodyTransform(state);
         assert(bodyDSensors.size());
         // Loop over each dsensor on this body.
         for (unsigned m=0; m < bodyDSensors.size(); ++m) {
             const DSensorIx mx = bodyDSensors[m];
+            // std::cout << "DSensorIx: " << mx << std::endl;
             const DSensor&  dsensor = dsensors[mx];
-            assert(dsensor.bodyB == mobodIx); // better be on this body!
-            const Rotation& R_GO = observations[getObservationIxForDSensor(mx)];
-            if (R_GO.isFinite()) { // skip NaNs
-                const Rotation R_GS = R_GB * dsensor.distanceInB;
-                const Rotation R_SO = ~R_GS*R_GO; // error, in S
-                const Vec4 aa_SO = R_SO.convertRotationToAngleAxis();
-                goal += dsensor.weight * square(aa_SO[0]);
+            // std::cout << "observation" << ""
+            assert(dsensor.bodyA == mobodIx); // better be on this body!
+            const MobilizedBody& mobodB  = matter.getMobilizedBody(dsensor.bodyB);
+            const Real& obs = getObservation(getObservationIxForDSensor(mx));
+            // const Real& R_GO = observations[getObservationIxForDSensor(mx)];
+            // std::cout << "obs: " << obs << "is nan: " << isNaN(obs) << std::endl;
+            if (!isNaN(obs)) { // skip NaNs
+                // const Transform& X_GB_A   = mobod.getBodyTransform(state);
+                const Transform& X_GB_B   = mobodB.getBodyTransform(state);
+                const Real& true_dist = (T_GB.p() - X_GB_B.p()).norm();
+                const Real& error = true_dist - obs; // error, in S
+                std::cout << "Error: " << error << " Obs: " << obs << std::endl;
+                goal += dsensor.weight * square(error);
                 wtot += dsensor.weight;
             }
         }
     }
 
     goal /= (2*wtot);
+    std::cout << "Goal: " << goal << std::endl;
 
     return 0;
 }
@@ -102,22 +112,24 @@ calcGoalGradient(const State& state, Vector& gradient) const {
         const MobilizedBodyIndex    mobodIx     = bodyp->first;
         const Array_<DSensorIx>&     bodyDSensors = bodyp->second;
         const MobilizedBody& mobod = matter.getMobilizedBody(mobodIx);
-        const Rotation& R_GB = mobod.getBodyRotation(state);
+        const Transform&             T_GB  = mobod.getBodyTransform(state);
         assert(bodyDSensors.size());
         // Loop over each dsensor on this body.
         for (unsigned m=0; m < bodyDSensors.size(); ++m) {
             const DSensorIx  mx = bodyDSensors[m];
             const DSensor&   dsensor = dsensors[mx];
-            assert(dsensor.bodyB == mobodIx); // better be on this body!
-            const Rotation& R_GO = observations[getObservationIxForDSensor(mx)];
-            if (R_GO.isFinite()) { // skip NaNs
-                const Rotation R_GS = R_GB * dsensor.distanceInB;
-                const Rotation R_SO = ~R_GS*R_GO; // error, in S
-                const Vec4 aa_SO = R_SO.convertRotationToAngleAxis();
-                const Vec3 trq_S = -dsensor.weight * aa_SO[0]
-                                    * aa_SO.getSubVec<3>(1);
-                const Vec3 trq_G = R_GS * trq_S;
-                mobod.applyBodyTorque(state, trq_G, dEdR);
+            assert(dsensor.bodyA == mobodIx); // better be on this body!
+            const MobilizedBody& mobodB  = matter.getMobilizedBody(dsensor.bodyB);
+            const Real& obs = getObservation(getObservationIxForDSensor(mx));
+            const Real& R_GO = observations[getObservationIxForDSensor(mx)];
+            if (!isNaN(obs)) { // skip NaNs
+                const Transform& X_GB_B   = mobodB.getBodyTransform(state);
+                const Vec3 error = T_GB.p() - X_GB_B.p(); // Calculate the error vector
+                const Real distanceError = error.norm() - obs; // Error in distance
+                const Vec3 force_S = dsensor.weight * distanceError * error.normalize();
+                const SpatialVec force_G = SpatialVec(Vec3(0), force_S);
+                mobod.applyBodyForce(state, force_G, dEdR);
+                mobodB.applyBodyForce(state, -force_G, dEdR);
                 wtot += dsensor.weight;
             }
         }
@@ -173,7 +185,8 @@ int DistanceSensors::initializeCondition() const {
     for (DSensorIx mx(0); mx < dsensors.size(); ++mx) {
         const DSensor& dsensor = dsensors[mx];
         if (hasObservation(mx) && dsensor.weight > 0)
-            bodiesWithDSensors[dsensor.bodyB].push_back(mx);
+            bodiesWithDSensors[dsensor.bodyA].push_back(mx);
+            // bodiesWithDSensors[dsensor.bodyB].push_back(mx);
     }
     return 0;
 }

@@ -91,19 +91,20 @@ class SimTK_SIMBODY_EXPORT DistanceSensors : public AssemblyCondition {
 // This is a private class used in the implementation below but not
 // accessible through the API.
 struct DSensor {
-    DSensor(const String& name, MobilizedBodyIndex bodyB, 
-            const Rotation& distanceInB, Real weight = 1)
-    :   name(name), bodyB(bodyB), distanceInB(distanceInB), weight(weight) 
+    DSensor(const String& name, MobilizedBodyIndex bodyA,
+     MobilizedBodyIndex bodyB, const Real& distance, Real weight = 1)
+    :   name(name), bodyA(bodyA), bodyB(bodyB), distance(distance), weight(weight) 
     { assert(weight >= 0); }
 
-    DSensor(MobilizedBodyIndex bodyB, const Rotation& distanceInB, 
+    DSensor(MobilizedBodyIndex bodyA, MobilizedBodyIndex bodyB, const Real& distance, 
             Real weight=1)
-    :   name(""), bodyB(bodyB), distanceInB(distanceInB), weight(weight) 
+    :   name(""), bodyA(bodyA), bodyB(bodyB), distance(distance), weight(weight) 
     { assert(weight >= 0); }
 
     String              name;
+    MobilizedBodyIndex  bodyA;
     MobilizedBodyIndex  bodyB;
-    Rotation            distanceInB;
+    Real                distance;
     Real                weight; 
 };
 
@@ -124,7 +125,7 @@ subsequent tracking steps. **/
 /*@{*/
 
 /** The default constructor creates an empty DistanceSensors 
-AssemblyCondition object that should be filled in with calls to addDSensor() 
+AssemblyCondition object that should be filled in with calls fto addDSensor() 
 and optionally defineObservationOrder(). **/
 DistanceSensors() : AssemblyCondition("DistanceSensors") {}
 
@@ -137,7 +138,7 @@ provided for it.
 @param[in]      bodyB
     The MobilizedBody to which this dsensor is fixed. DSensors on Ground
     are allowed but will be ignored.
-@param[in]      distanceInB
+@param[in]      distance
     This is the orientation of the dsensor in \a bodyB's local frame.
 @param[in]      weight
     An optional weight for use in defining the objective function, which
@@ -147,8 +148,8 @@ provided for it.
 assigned sequentially as the dsensors are added. 
 @note Adding an dsensor invalidates any observation/dsensor correspondence; be
 sure to call defineObservationOrder() \e after defining all your dsensors. **/
-DSensorIx addDSensor(const String& name, MobilizedBodyIndex bodyB, 
-                     const Rotation& distanceInB, Real weight=1)
+DSensorIx addDSensor(const String& name, MobilizedBodyIndex bodyA, MobilizedBodyIndex bodyB,
+                     const Real& distance, Real weight=1)
 {   SimTK_ERRCHK1_ALWAYS(isFinite(weight) && weight >= 0, 
         "DistanceSensors::addDSensor()", 
         "Illegal orientation sensor weight %g.", weight);
@@ -168,7 +169,7 @@ DSensorIx addDSensor(const String& name, MobilizedBodyIndex bodyB,
         "DSensor name '%s' was already use for DSensor %d.",
         nm.c_str(), (int)found.first->second); 
 
-    dsensors.push_back(DSensor(nm,bodyB,distanceInB,weight));
+    dsensors.push_back(DSensor(nm,bodyA, bodyB, distance,weight));
     return ix; 
 }
 
@@ -176,9 +177,9 @@ DSensorIx addDSensor(const String& name, MobilizedBodyIndex bodyB,
 will be "_UNNAMED_XX" where XX is the DSensorIx assigned to that dsensor 
 (don't use names of that form yourself).  
 @see addDSensor(name,...) for more information. **/
-DSensorIx addDSensor(MobilizedBodyIndex bodyB, const Rotation& distanceInB,
-                     Real weight=1)
-{   return addDSensor("", bodyB, distanceInB, weight); }
+DSensorIx addDSensor(MobilizedBodyIndex bodyA, MobilizedBodyIndex bodyB,
+                     const Real& distance, Real weight=1)
+{   return addDSensor("", bodyA, bodyB, distance, weight); }
 
 
 /** Define the meaning of the observation data by giving the DSensorIx 
@@ -230,8 +231,7 @@ void defineObservationOrder(const Array_<DSensorIx>& observationOrder) {
     }
     // Make room for dsensor observations.
     observations.clear();
-    observations.resize(observation2dsensor.size(),
-                        Rotation().setRotationToNaN());
+    observations.resize(observation2dsensor.size(), NaN);
 }
 
 /** Define the meaning of the observations by giving the dsensor name 
@@ -309,8 +309,8 @@ MobilizedBodyIndex getDSensorBody(DSensorIx mx) const
 
 /** Get the orientation (coordinate axes fixed in its body frame) of the given
 dsensor. **/
-const Rotation& getDSensorStation(DSensorIx mx) const
-{   return dsensors[mx].distanceInB; }
+const Real& getDSensorStation(DSensorIx mx) const
+{   return dsensors[mx].distance; }
 
 /** Return the number of observations that were defined via the last call to
 defineObservationOrder(). These are not necessarily all being used. If 
@@ -372,7 +372,7 @@ step-to-step data including the resulting dsensor errors. **/
 /** Move a single dsensor's observed orientation without moving any of the 
 others. If the value contains a NaN, this dsensor/observation pair will be 
 ignored the next time the assembly goal cost function is calculated. **/
-void moveOneObservation(ObservationIx ox, const Rotation& observation) {
+void moveOneObservation(ObservationIx ox, const Real& observation) {
     SimTK_ERRCHK_ALWAYS(!observations.empty(), "Assembler::moveOneObservation()",
         "There are currently no observations defined. Either the Assembler"
         " needs to be initialized to get the default observation order, or you"
@@ -395,7 +395,7 @@ the number of defined observations; you can obtain that using
 getNumObservations(). Any observations that contain a NaN will be ignored; that
 dsensor/observation pair will not be used in the next calculation of the 
 assembly goal cost function. **/
-void moveAllObservations(const Array_<Rotation>& observations) {
+void moveAllObservations(const Array_<Real>& observations) {
     SimTK_ERRCHK2_ALWAYS(   (int)observations.size() 
                          == (int)observation2dsensor.size(),
         "DSensors::moveAllObservations()",
@@ -433,7 +433,7 @@ void changeDSensorWeight(DSensorIx mx, Real weight) {
 is the orientation to which we will try to rotate the corresponding dsensor if 
 there is one. The result might be NaN if there is no current value for this 
 observation; you can check using Rotation's isFinite() method. **/
-const Rotation& getObservation(ObservationIx ox) const 
+const Real& getObservation(ObservationIx ox) const 
 {   return observations[ox]; }
 
 /** Return the current values of all the observed orientations. These are the
@@ -442,14 +442,14 @@ those observations that have corresponding dsensors defined. Some of the values
 may be NaN if there is currently no corresponding observation. Note that these
 are indexed by ObservationIx; use getObservationIxForDSensor() to map a 
 DSensorIx to its corresponding ObservationIx. **/
-const Array_<Rotation,ObservationIx>& getAllObservations() const
+const Array_<Real,ObservationIx>& getAllObservations() const
 {   return observations; }
 
 /** Using the current value of the internal state, calculate the ground
 frame orientation of a particular dsensor. The difference between this 
 orientation and the corresponding observation is the current error for this 
 dsensor. **/
-Rotation findCurrentDSensorDistance(DSensorIx mx) const;
+Real findCurrentDSensorDistance(DSensorIx mx) const;
 
 /** Using the current value of the internal state, calculate the error 
 between the given dsensor's current orientation and its corresponding observed
@@ -459,13 +459,14 @@ or if the observed location is missing (indicated by a NaN value), then the
 error is reported as zero. **/
 Real findCurrentDSensorError(DSensorIx mx) const {
     const ObservationIx ox = getObservationIxForDSensor(mx);
+    // TODO: Fix this
     if (!ox.isValid()) return 0; // no observation for this dsensor
-    const Rotation& R_GO = getObservation(ox);
-    if (!R_GO.isFinite()) return 0; // NaN in observation; error is ignored
-    const Rotation R_GS = findCurrentDSensorDistance(mx);
-    const Rotation R_SO = ~R_GS*R_GO; // orientation error, in S
-    const Vec4 aa_SO = R_SO.convertRotationToAngleAxis();
-    return std::abs(aa_SO[0]);
+    const Real& obs = getObservation(ox);
+    if (isNaN(obs)) return 0; // NaN in observation; error is ignored
+    const Real calc = findCurrentDSensorDistance(mx);
+    const Real error = calc - obs; // distance error, in S
+    return std::abs(error);
+    return 0;
 }
 /*@}*/
 
@@ -509,7 +510,7 @@ Array_<ObservationIx,DSensorIx> dsensor2observation;
 // This is the current set of dsensor orientation observations, one per entry in 
 // the observation2dsensor array. Changing the values here does not uninitialize
 // the Assembler.            
-Array_<Rotation,ObservationIx>  observations;
+Array_<Real,ObservationIx>  observations;
 
 // After initialize, this groups the dsensors by body and weeds out
 // any zero-weighted dsensors. TODO: skip low-weighted dsensors, at
