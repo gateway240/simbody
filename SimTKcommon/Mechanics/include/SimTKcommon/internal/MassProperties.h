@@ -537,15 +537,15 @@ void errChk(const char* methodName) const {
     // rotation matrices that were produced by an 11,000 body chain that
     // Sam Flores encountered. 
     const P Slop = std::max(d.sum(),P(1))
-                       * std::sqrt(NTraits<P>::getEps());
+                       * NTraits<P>::getSqrtEps();
 
     SimTK_ERRCHK3(   Ixx+Iyy+Slop>=Izz 
                   && Ixx+Izz+Slop>=Iyy 
                   && Iyy+Izz+Slop>=Ixx,
         methodName,
         "Diagonals of an Inertia matrix must satisfy the triangle "
-        "inequality; got %g,%g,%g.",
-        (double)Ixx,(double)Iyy,(double)Izz);
+        "inequality; Slop is: %g got %g,%g,%g.",
+        (double)Slop, (double)Ixx,(double)Iyy,(double)Izz);
 
     // Thanks to Paul Mitiguy for this condition on products of inertia.
     SimTK_ERRCHK(   Ixx+Slop>=std::abs(2*Iyz) 
