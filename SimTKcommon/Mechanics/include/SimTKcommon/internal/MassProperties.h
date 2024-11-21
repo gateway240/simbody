@@ -538,14 +538,14 @@ void errChk(const char* methodName) const {
     // Sam Flores encountered. 
     const P Slop = std::max(d.sum(),P(1))
                        * NTraits<P>::getSqrtEps();
-
+    std::cout << "Slop: " << Slop << std::endl;
     SimTK_ERRCHK3(   Ixx+Iyy+Slop>=Izz 
                   && Ixx+Izz+Slop>=Iyy 
                   && Iyy+Izz+Slop>=Ixx,
         methodName,
         "Diagonals of an Inertia matrix must satisfy the triangle "
-        "inequality; Slop is: %g got %g,%g,%g.",
-        (double)Slop, (double)Ixx,(double)Iyy,(double)Izz);
+        "inequality; got %g,%g,%g.",
+        (double)Ixx,(double)Iyy,(double)Izz);
 
     // Thanks to Paul Mitiguy for this condition on products of inertia.
     SimTK_ERRCHK(   Ixx+Slop>=std::abs(2*Iyz) 
