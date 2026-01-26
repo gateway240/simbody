@@ -414,7 +414,7 @@ Element getRootElement();
 
 /** Shortcut for getting the tag word of the root element which is usually
 the document type. This is the same as getRootElement().getElementTag(). **/
-const String& getRootTag() const;
+const String getRootTag() const;
 /** Shortcut for changing the tag word of the root element which is usually
 the document type. This is the same as getRootElement().setElementTag(tag). **/
 void setRootTag(const String& tag);
@@ -574,10 +574,10 @@ typically an Attribute object that has just been constructed, or one that
 has been cloned from another Attribute. **/
 bool isOrphan() const;
 /** If this is a valid attribute handle, get the name of the attribute. **/
-const String& getName() const;
+const String getName() const;
 /** If this is a valid attribute handle, get the value of the attribute
 as a String, not including the quotes. **/
-const String& getValue() const;
+const String getValue() const;
 /** If this is a valid attribute handle, change its name.
 @return A reference to this attribute that now has the new name. **/
 Attribute& setName(const String& name);
@@ -838,7 +838,7 @@ is what you get for each type of node:
   - Text:    the text
   - Element: the element's tag word (\e not the element's value)
   - None:    (i.e., an empty handle) throw an error. **/
-const String& getNodeText() const;
+const String getNodeText() const;
 
 /** Serialize this node (and everything it contains) to the given String.
 The output will be "pretty printed" and terminated with a newline unless you
@@ -1101,7 +1101,7 @@ Element clone() const;
 
 /** Get the element tag word. This may represent the name or type of the
 element depending on context. **/
-const String& getElementTag() const;
+const String getElementTag() const;
 /** Change the tag word that is used to bracket this element. **/
 void setElementTag(const String& tag);
 
@@ -1161,7 +1161,7 @@ definition of a "value element".
 Node::getNodeText() does in the case of an element node; that returns the
 element tag word not its contents.
 @see isValueElement(), setValue(), updValue() **/
-const String& getValue() const;
+const String getValue() const;
 
 /** Obtain a writable reference to the String containing the value of this
 value element. An error will be thrown if this is not a value element. If the
@@ -1220,7 +1220,7 @@ zero or one Text nodes; if none we'll return a null string, otherwise
 the value of the Text node. Thus an element like "<tag>stuff</tag>" will
 have the value "stuff". An error will be thrown if either the element
 is not found or it is not a "value element". **/
-const String&
+const String
 getRequiredElementValue(const String& tag) const
 {   return unconst().getRequiredElement(tag).getValue(); }
 
@@ -1284,7 +1284,7 @@ void eraseAttribute(const String& name);
 
 /** Get the value of an attribute as a string and throw an error if that
 attribute is not present. **/
-const String&
+const String
 getRequiredAttributeValue(const String& name) const
 {   return unconst().getRequiredAttribute(name).getValue(); }
 
@@ -1441,6 +1441,8 @@ static Element& getAs(Node& node);
                                   private:
 friend class Node;
 friend class element_iterator;
+mutable SimTK::String m_tmpValue; // temporary storage for updValue()
+
 
 explicit Element(tinyxml2::XMLElement* tiElt)
 :   Node(reinterpret_cast<tinyxml2::XMLNode*>(tiElt)) {}

@@ -93,10 +93,11 @@ class Xml::Document::Impl {
     // get our root element pointing correctly into the copy rather than
     // at the source's root element.
     Impl* clone() const {
-        // Impl* newImpl = new Impl();
-        // newImpl->m_tixml = m_tixml;
-        // root element isn't set yet
-        return nullptr;
+        Impl* newImpl = new Impl();
+        m_tixml.DeepCopy(&newImpl->m_tixml);
+        newImpl->m_indent = m_indent;
+        newImpl->m_rootElement.clear();
+        return newImpl;
     }
 
     void clear() {
@@ -104,19 +105,15 @@ class Xml::Document::Impl {
         m_rootElement.clear();
     }
 
-    void setIndentString(const String& indent) {
-        // m_tixml.setIndentString(indent);
-    }
-    const String& getIndentString() const {
-        //  return m_tixml.GetIndentString();
-    }
+    void setIndentString(const String& indent) { m_indent = indent; }
+    const String& getIndentString() const { return m_indent; }
 
     void readFromFile(const String& pathname) {
         clear();
         m_tixml.SetValue(pathname);
         auto status = m_tixml.LoadFile(pathname);
         SimTK_ERRCHK2_ALWAYS(
-            status != tinyxml2::XMLError::XML_SUCCESS, "Xml::readFromFile()",
+            status == tinyxml2::XML_SUCCESS, "Xml::readFromFile()",
             "Failed to load the Xml file '%s' with error '%s'.",
             pathname.c_str(), m_tixml.ErrorStr());
     }
@@ -126,7 +123,7 @@ class Xml::Document::Impl {
         m_tixml.DeepCopy(&tempDoc);
         auto status = tempDoc.SaveFile(pathname.c_str());
         SimTK_ERRCHK2_ALWAYS(
-            status != tinyxml2::XMLError::XML_SUCCESS, "Xml::writeToFile()",
+            status == tinyxml2::XML_SUCCESS, "Xml::writeToFile()",
             "Failed to write to the Xml file '%s' with error '%s'.",
             pathname.c_str(), m_tixml.ErrorStr());
     }
@@ -134,8 +131,10 @@ class Xml::Document::Impl {
     void readFromString(const char* xmlDocument) {
         clear();
         auto status = m_tixml.Parse(xmlDocument);
-        SimTK_ERRCHK1_ALWAYS(status != tinyxml2::XMLError::XML_SUCCESS, "Xml::readFromString()",
-                             "Failed to parse the Xml string with error '%s'.", m_tixml.ErrorStr());
+        SimTK_ERRCHK1_ALWAYS(status == tinyxml2::XML_SUCCESS,
+                             "Xml::readFromString()",
+                             "Failed to parse the Xml string with error '%s'.",
+                             m_tixml.ErrorStr());
     }
 
     void writeToString(String& xmlDocument, bool compact) const {
@@ -263,11 +262,10 @@ class Xml::Document::Impl {
             if (moveMe == lastEltOrText) break;
         }
 
-
         // Now link the new root element right where we found the first
         // element or text node.
         if (nodeBeforeFirst)
-        m_tixml.LinkEndChild(nodeBeforeFirst);
+            m_tixml.LinkEndChild(nodeBeforeFirst);
         else
             m_tixml.LinkEndChild(root);
 
@@ -286,6 +284,8 @@ class Xml::Document::Impl {
    private:
     Impl(const Impl&);             // disable; use clone()
     Impl& operator=(const Impl&);  // "
+
+    SimTK::String m_indent = "  ";
 };
 
 //------------------------------------------------------------------------------
@@ -358,14 +358,14 @@ const String& Xml::Document::getIndentString() const {
     // tinyxml2::XMLBase::SetCondenseWhiteSpace(shouldCondense);
 }
 /*static*/ bool Xml::Document::isXmlWhiteSpaceCondensed() {
-    // return tinyxml2::XMLBase::IsWhiteSpaceCondensed();
+    return true;
 }
 
 Xml::Element Xml::Document::getRootElement() {
     assert(getImpl().m_rootElement.isValid());
     return updImpl().m_rootElement;
 }
-const String& Xml::Document::getRootTag() const {
+const String Xml::Document::getRootTag() const {
     return unconst().getRootElement().getElementTag();
 }
 void Xml::Document::setRootTag(const String& tag) {
@@ -398,7 +398,7 @@ void Xml::Document::insertTopLevelNodeAfter(const Xml::node_iterator& afterThis,
                         "The node_iterator did not refer to a top-level Node.");
 
     updImpl().m_tixml.InsertAfterChild(afterThis->updTiNodePtr(),
-                                     insertThis.updTiNodePtr());
+                                       insertThis.updTiNodePtr());
 }
 
 void Xml::Document::insertTopLevelNodeBefore(
@@ -427,7 +427,7 @@ void Xml::Document::insertTopLevelNodeBefore(
                         "The node_iterator did not refer to a top-level Node.");
 
     updImpl().m_tixml.InsertAfterChild(beforeThis->updTiNodePtr(),
-                                      insertThis.updTiNodePtr());
+                                       insertThis.updTiNodePtr());
 }
 
 void Xml::Document::eraseTopLevelNode(const Xml::node_iterator& deleteThis) {
@@ -470,15 +470,60 @@ Xml::Node Xml::Document::removeTopLevelNode(
     return Node(*removeThis);
 }
 
-String Xml::Document::getXmlVersion() const {
-    return getImpl().m_tixml.ToDeclaration()->Value();
+SimTK::String Xml::Document::getXmlVersion() const {
+    const tinyxml2::XMLNode* first = getImpl().m_tixml.FirstChild();
+    const tinyxml2::XMLDeclaration* decl =
+        first ? first->ToDeclaration() : nullptr;
+
+    if (!decl) return "";
+
+    // Example: xml version="1.0" encoding="UTF-8"
+    const char* value = decl->Value();
+    if (!value) return "";
+
+    const char* p = strstr(value, "version=");
+    if (!p) return "";
+
+    p += strlen("version=");
+    if (*p == '"' || *p == '\'') ++p;
+
+    const char* end = strpbrk(p, "\"'");
+    return end ? SimTK::String(p, end - p) : "";
 }
-String Xml::Document::getXmlEncoding() const {
-    return getImpl().m_tixml.ToDeclaration()->Value();
+
+SimTK::String Xml::Document::getXmlEncoding() const {
+    const tinyxml2::XMLNode* first = getImpl().m_tixml.FirstChild();
+    const tinyxml2::XMLDeclaration* decl =
+        first ? first->ToDeclaration() : nullptr;
+
+    if (!decl) return "";
+
+    const char* value = decl->Value();
+    if (!value) return "";
+
+    const char* p = strstr(value, "encoding=");
+    if (!p) return "";
+
+    p += strlen("encoding=");
+    if (*p == '"' || *p == '\'') ++p;
+
+    const char* end = strpbrk(p, "\"'");
+    return end ? SimTK::String(p, end - p) : "";
 }
+
 bool Xml::Document::getXmlIsStandalone() const {
-    // return String::toLower(
-    //            getImpl().gettinyxml2::XMLDeclaration().Standalone()) != "no";
+    auto* decl = getImpl().m_tixml.FirstChild()->ToDeclaration();
+    const char* declText = decl->Value();  // e.g., 'xml version="1.0"
+                                           // encoding="UTF-8" standalone="yes"'
+    if (!declText) return false;
+
+    std::string text = declText;
+    std::transform(text.begin(), text.end(), text.begin(), ::tolower);
+
+    // look for standalone="no"
+    if (text.find("standalone=\"no\"") != std::string::npos) return false;
+    // anything else (yes, missing, malformed) => true
+    return true;
 }
 
 void Xml::Document::setXmlVersion(const String& version) {
@@ -535,15 +580,15 @@ bool Xml::Attribute::isOrphan() const {
     return false;
 }
 
-const String& Xml::Attribute::getName() const {
+const String Xml::Attribute::getName() const {
     SimTK_ERRCHK_ALWAYS(isValid(), "Xml::Attribute::getName()",
                         "The attribute handle was empty.");
-    return getTiAttr().Name();
+    return SimTK::String(getTiAttr().Name());
 }
-const String& Xml::Attribute::getValue() const {
+const String Xml::Attribute::getValue() const {
     SimTK_ERRCHK_ALWAYS(isValid(), "Xml::Attribute::getValue()",
                         "The attribute handle was empty.");
-    return getTiAttr().Value();
+    return SimTK::String(getTiAttr().Value());
 }
 
 Xml::Attribute& Xml::Attribute::setName(const String& name) {
@@ -596,9 +641,13 @@ Xml::attribute_iterator Xml::attribute_iterator::operator--(int) {
 //                                 XML NODE
 //------------------------------------------------------------------------------
 Xml::Node Xml::Node::clone() const {
-    tinyxml2::XMLNode* newNode = 0;
-    // if (tiNode) newNode = tiNode->Clone();
-    // return Node(newNode);
+    if (!tiNode) return Node(nullptr);
+
+    tinyxml2::XMLDocument* doc = tiNode->GetDocument();
+    assert(doc);
+
+    tinyxml2::XMLNode* newNode = tiNode->DeepClone(doc);
+    return Node(newNode);
 }
 
 void Xml::Node::clear() {
@@ -631,10 +680,10 @@ Xml::NodeType Xml::Node::getNodeType() const {
         return ElementNode;
     } else {
         SimTK_ASSERT1_ALWAYS(false,
-                            "Xml::Node::getNodeType(): can't convert "
-                            "TinyXML node type '%s' to any "
-                            "SimTK::Xml node type.",
-                            getTiNode().Value());
+                             "Xml::Node::getNodeType(): can't convert "
+                             "TinyXML node type '%s' to any "
+                             "SimTK::Xml node type.",
+                             getTiNode().Value());
     }
 
     return NoNode;
@@ -645,11 +694,10 @@ String Xml::Node::getNodeTypeAsString() const {
     return Xml::getNodeTypeAsString(getNodeType());
 }
 
-const String& Xml::Node::getNodeText() const {
+const String Xml::Node::getNodeText() const {
     SimTK_ERRCHK_ALWAYS(isValid(), "Xml::Node::getText()",
                         "Can't get text from an empty Node handle.");
-
-    return getTiNode().Value();
+    return SimTK::String(getTiNode().Value());
 }
 
 bool Xml::Node::isTopLevelNode() const {
@@ -742,8 +790,7 @@ static bool elementIsAllowed(const String& tag,
     return false;
 }
 
-Xml::Element::Element(const String& tag, const String& value)
-    : Node() {
+Xml::Element::Element(const String& tag, const String& value) : Node() {
     if (value.empty()) return;
     // We need to add a Text node.
     // updTiElement().LinkEndChild(new tinyxml2::XMLText(value));
@@ -755,9 +802,10 @@ Xml::Element Xml::Element::clone() const {
     return Element(newElt);
 }
 
-const String& Xml::Element::getElementTag() const {
-    // return getTiNode().ValueStr();
+const String Xml::Element::getElementTag() const {
+    return getTiNode().Value();
 }
+
 void Xml::Element::setElementTag(const String& type) {
     updTiNode().SetValue(type);
 }
@@ -769,7 +817,7 @@ bool Xml::Element::isValueElement() const {
     return text == node_end() || ++text == node_end();  // zero or one
 }
 
-const String& Xml::Element::getValue() const {
+const String Xml::Element::getValue() const {
     static const String null;
     SimTK_ERRCHK1_ALWAYS(isValueElement(), "Xml::Element::getValue()",
                          "Element <%s> is not a value element.",
@@ -781,19 +829,29 @@ const String& Xml::Element::getValue() const {
 
 // Must add a Text node now if this Element doesn't have one.
 String& Xml::Element::updValue() {
-    SimTK_ERRCHK1_ALWAYS(isValueElement(), "Xml::Element::getValue()",
+    SimTK_ERRCHK1_ALWAYS(isValueElement(), "Xml::Element::updValue()",
                          "Element <%s> is not a value element.",
                          getElementTag().c_str());
 
-    node_iterator text = node_begin(TextNode);
-    // if (text != node_end()) return Text::getAs(*text).updText();
+    tinyxml2::XMLText* textp = nullptr;
+    tinyxml2::XMLNode* child = updTiElement().FirstChild();
+    if (child) textp = child->ToText();
 
-    // We need to add a Text node.
-    // tinyxml2::XMLText* textp = new tinyxml2::XMLText("");
-    // updTiElement().LinkEndChild(textp);
-    // return textp->UpdValueStr();
-    String string = nullptr;
-    return string;
+    if (!textp) {
+        tinyxml2::XMLDocument* doc = updTiElement().GetDocument();
+        assert(doc);
+        textp = doc->NewText("");
+        updTiElement().InsertEndChild(textp);
+    }
+
+    // Store in member variable
+    m_tmpValue = textp->Value() ? textp->Value() : "";
+
+    // Immediately sync back to XML whenever m_tmpValue changes
+    // (can be done manually after assignment)
+    textp->SetValue(m_tmpValue.c_str());
+
+    return m_tmpValue;
 }
 
 // If there is no Text node we'll add one; if there is just one we'll
