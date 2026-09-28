@@ -859,7 +859,14 @@ public:
     /// for internal use only -- don't call this constructor unless you really 
     /// know what you're doing.
     explicit MatrixBase(MatrixHelperRep<Scalar>* hrep) : helper(hrep) {}
-
+    
+    MatrixIterator<ELT, MatrixBase<ELT>> begin() {
+        return MatrixIterator<ELT, MatrixBase<ELT>>(*this, 0);
+    }
+    MatrixIterator<ELT, MatrixBase<ELT>> end() {
+        return MatrixIterator<ELT, MatrixBase<ELT>>(*this, this->nelt());
+    }
+    
 protected:
     const MatrixHelper<Scalar>& getHelper() const {return helper;}
     MatrixHelper<Scalar>&       updHelper()       {return helper;}

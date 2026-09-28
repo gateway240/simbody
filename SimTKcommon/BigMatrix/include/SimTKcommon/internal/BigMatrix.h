@@ -174,6 +174,7 @@ namespace SimTK {
     template <class ELT = Real> class RowVector_;
 
     template <class ELT, class VECTOR_CLASS> class VectorIterator;
+    template <class ELT, class MATRIX_CLASS> class MatrixIterator;
 }
 
 #include "SimTKcommon/internal/MatrixBase.h"
@@ -190,6 +191,7 @@ namespace SimTK {
 #include "SimTKcommon/internal/RowVector_.h"
 
 #include "SimTKcommon/internal/VectorIterator.h"
+#include "SimTKcommon/internal/MatrixIterator.h"
 
 
 namespace SimTK {
