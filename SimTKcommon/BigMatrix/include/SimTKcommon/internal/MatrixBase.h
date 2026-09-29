@@ -159,6 +159,9 @@ public:
     /// otherwise uncommitted.
     MatrixBase() : helper(NScalarsPerElement,CppNScalarsPerElement) {}
 
+    // MatrixBase(std::initializer_list<ELT> init) {}
+    // MatrixBase(std::initializer_list<std::initializer_list<ELT>> rows) {}
+
     /// This constructor allocates the default matrix a completely uncommitted
     /// matrix commitment, given particular initial dimensions.
     MatrixBase(int m, int n) 

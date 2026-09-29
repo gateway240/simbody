@@ -81,7 +81,14 @@ template <class S> const MatrixCharacter&
 MatrixHelper<S>::getMatrixCharacter() const
 {   return getRep().getMatrixCharacter(); }
 
+// template <class S> 
+// MatrixHelper<S>::MatrixHelper(std::initializer_list<MatrixHelper<S>> init) {
 
+// }
+// template <class S>
+// MatrixHelper<S>::MatrixHelper(std::initializer_list<std::initializer_list<S>> rows) {
+
+// }
 
 // This is the constructor for a Matrix in which only the handle commitment has been
 // supplied. The allocated matrix will have the smallest size that satisfies the
