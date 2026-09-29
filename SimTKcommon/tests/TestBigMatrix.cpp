@@ -316,6 +316,16 @@ int main() {
         SimTK_TEST_EQ(row1view.hasContiguousData(), false);
         SimTK_TEST_EQ(row1.hasContiguousData(), true);
 
+        SimTK::Matrix_<double> data{
+            {1,2,3},
+            {4,5,6},
+            {7,8,9}
+        };
+        // SimTK::Matrix_<SimTK::Vec3> data{
+        //     {{1, 1, 1}, {2, 2, 2}},
+        //     {{3, 3, 3}, {4, 4, 4}}
+        // };
+
     } catch(const std::exception& e) {
         cout << "exception: " << e.what() << endl;
         return 1;

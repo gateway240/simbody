@@ -159,6 +159,9 @@ public:
     /// otherwise uncommitted.
     MatrixBase() : helper(NScalarsPerElement,CppNScalarsPerElement) {}
 
+    // MatrixBase(std::initializer_list<ELT> init) {}
+    // MatrixBase(std::initializer_list<std::initializer_list<ELT>> rows) {}
+
     /// This constructor allocates the default matrix a completely uncommitted
     /// matrix commitment, given particular initial dimensions.
     MatrixBase(int m, int n) 
@@ -239,7 +242,9 @@ public:
                const ELT* cppInitialValuesByRow) 
     :   helper(NScalarsPerElement, CppNScalarsPerElement, commitment, m, n)
     {   helper.copyInByRowsFromCpp(reinterpret_cast<const Scalar*>(cppInitialValuesByRow)); }
-     
+    MatrixBase(std::initializer_list<std::initializer_list<ELT>> init) {
+
+    }
     /// @name           Matrix view of pre-exising data
     ///
     /// Non-resizeable view of someone else's already-allocated 

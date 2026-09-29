@@ -102,6 +102,10 @@ public:
         // "Owner" constructors //
         //////////////////////////
     
+    // MatrixHelper(std::initializer_list<MatrixHelper<S>> init);
+    // MatrixHelper(std::initializer_list<std::initializer_list<S>> rows);
+
+
     // 0x0, fully resizable, fully uncommitted.
     MatrixHelper(int esz, int cppEsz);
 

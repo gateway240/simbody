@@ -27,6 +27,8 @@
 /** @file
 Define the SimTK::Matrix_ class that is part of Simbody's BigMatrix toolset. **/
 
+#include <initializer_list>
+#include <vector>
 namespace SimTK {
 
 //==============================================================================
@@ -65,6 +67,9 @@ template <class ELT> class Matrix_ : public MatrixBase<ELT> {
 
 public:
     Matrix_() : Base() { }
+    // Matrix_(std::initializer_list<ELT> init) {}
+    // Matrix_(std::initializer_list<std::initializer_list<ELT>> rows) {};
+
     explicit Matrix_(const MatrixCommitment& mc) : Base(mc) {}
 
     // Copy constructor is deep.
@@ -92,6 +97,30 @@ public:
 
     Matrix_(int m, int n, const ELT* cppInitialValuesByRow) 
     :   Base(MatrixCommitment(), m, n, cppInitialValuesByRow) {}
+    const ELT* flatten(
+    std::initializer_list<std::initializer_list<ELT>> init)
+    {
+        std::vector<ELT> result;
+
+        const auto n = init.begin()->size();
+        result.reserve(init.size() * n);
+
+        for (const auto& row : init) {
+            if (row.size() != n)
+                throw std::invalid_argument("Matrix rows must have equal length");
+
+            result.insert(result.end(), row.begin(), row.end());
+        }
+
+        return result.data();
+    }
+    Matrix_(std::initializer_list<std::initializer_list<ELT>> init)
+    :   Matrix_(
+            static_cast<int>(init.size()), // m
+            static_cast<int>(init.begin()->size()), // n
+            flatten(init))
+        {}
+
     Matrix_(int m, int n, const ELT& initialValue) 
     :   Base(MatrixCommitment(), m, n, initialValue) {}
     
